@@ -13,7 +13,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import com.perm.utils.Utils;
 import com.perm.utils.WrongResponseCodeException;
-import android.util.Log;
 
 public class Api {
     static final String TAG="Kate.Api";
@@ -80,14 +79,11 @@ public class Api {
         String body="";
         if(is_post)
             body=params.getParamsString();
-        Log.i(TAG, "url="+url);
-        if(body.length()!=0)
-            Log.i(TAG, "body="+body);
+
         String response="";
         for(int i=1;i<=MAX_TRIES;++i){
             try{
-                if(i!=1)
-                    Log.i(TAG, "try "+i);
+
                 response = sendRequestInternal(url, body, is_post);
                 break;
             }catch(javax.net.ssl.SSLException ex){
@@ -96,7 +92,6 @@ public class Api {
                 processNetworkException(i, ex);
             }
         }
-        Log.i(TAG, "response="+response);
         JSONObject root=new JSONObject(response);
         checkError(root, url);
         return root;
@@ -123,7 +118,6 @@ public class Api {
             if(is_post)
                 connection.getOutputStream().write(body.getBytes("UTF-8"));
             int code=connection.getResponseCode();
-            Log.i(TAG, "code="+code);
             //It may happen due to keep-alive problem http://stackoverflow.com/questions/1440957/httpurlconnection-getresponsecode-returns-1-on-second-invocation
             if (code==-1)
                 throw new WrongResponseCodeException("Network error");
@@ -1536,7 +1530,6 @@ public class Api {
             String religion, String interests, String company, String position, Long gid) throws IOException, JSONException, KException {
         String uids = Utils.parseProfileId(q);
         if (uids != null && uids.length() > 0 && (offset == null || offset == 0)) {
-            Log.i(TAG, "Search with uid = " + uids);
             String code = "var a=API.users.search({\"q\":\"" + q + "\",\"count\":" + count + ",\"count\":" + offset + ",\"fields\":\"" + fields + "\"});";
             code += "var b=API.users.get({\"user_ids\":" + uids +",\"fields\":\"" + fields + "\"});";
             code += "return b+a.items;";
