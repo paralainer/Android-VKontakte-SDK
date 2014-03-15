@@ -1,13 +1,20 @@
 package com.perm.kate.api;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.zip.GZIPInputStream;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -15,8 +22,6 @@ import com.perm.utils.Utils;
 import com.perm.utils.WrongResponseCodeException;
 
 public class Api {
-    static final String TAG="Kate.Api";
-    
     public static final String BASE_URL="https://api.vk.com/method/";
     public static final String API_VERSION="5.5";
     
@@ -127,8 +132,7 @@ public class Api {
             String enc=connection.getHeaderField("Content-Encoding");
             if(enc!=null && enc.equalsIgnoreCase("gzip"))
                 is = new GZIPInputStream(is);
-            String response=Utils.convertStreamToString(is);
-            return response;
+            return Utils.convertStreamToString(is);
         }
         finally{
             if(connection!=null)
@@ -437,9 +441,8 @@ public class Api {
         JSONObject response=root.optJSONObject("response");
         JSONArray array=response.optJSONArray("items");
         if (array == null)
-            return new ArrayList<Photo>(); 
-        ArrayList<Photo> photos = parsePhotos(array);
-        return photos;
+            return new ArrayList<Photo>();
+        return parsePhotos(array);
     }
     
     //http://vk.com/dev/photos.getUserPhotos
@@ -454,9 +457,8 @@ public class Api {
         JSONObject response=root.optJSONObject("response");
         JSONArray array=response.optJSONArray("items");
         if (array == null)
-            return new ArrayList<Photo>(); 
-        ArrayList<Photo> photos = parsePhotos(array);
-        return photos;
+            return new ArrayList<Photo>();
+        return parsePhotos(array);
     }
 
     //http://vk.com/dev/photos.getAll
@@ -470,9 +472,8 @@ public class Api {
         JSONObject response=root.optJSONObject("response");
         JSONArray array=response.optJSONArray("items");
         if (array == null)
-            return new ArrayList<Photo>(); 
-        ArrayList<Photo> photos = parsePhotos(array);
-        return photos;
+            return new ArrayList<Photo>();
+        return parsePhotos(array);
     }
     
     //http://vk.com/dev/photos.getComments
@@ -588,8 +589,7 @@ public class Api {
         if (from_group)
             params.put("from_group", "1");
         JSONObject root = sendRequest(params, true);
-        long message_id = root.optLong("response");
-        return message_id;
+        return root.optLong("response");
     }
     
     //http://vk.com/dev/photos.editComment
@@ -2474,6 +2474,16 @@ public class Api {
         JSONObject response = root.getJSONObject("response");
         return response.getString("upload_url");
     }
+
+    public String docsGetWallUploadServer(String group_id)
+            throws IOException, JSONException, KException
+    {
+        Params params = new Params("docs.getUploadServer");
+        params.put("group_id", group_id);
+        JSONObject root = sendRequest(params);
+        JSONObject response = root.getJSONObject("response");
+        return response.getString("upload_url");
+    }
     
     //http://vk.com/dev/docs.save
     public Document saveDoc(String file) throws IOException, JSONException, KException {
@@ -2777,5 +2787,63 @@ public class Api {
         JSONObject root = sendRequest(params, true);
         Long lyrics_id = root.optLong("response");
         return lyrics_id;
+    }
+
+    public Document uploadDocToWall(String filePath, String group_id, String filename)
+    {
+        try
+        {
+            String uploadServer = docsGetWallUploadServer(group_id);
+            HttpClient client = new DefaultHttpClient();
+            HttpPost httpPost = new HttpPost(uploadServer);
+            MultipartEntity albumArtEntity = new MultipartEntity();
+            FileBody fileBody = new FileBody(new File(filePath));
+            setFileName(filename, fileBody);
+            albumArtEntity.addPart("file", fileBody);
+            httpPost.setEntity(albumArtEntity);
+            HttpResponse response = client.execute(httpPost);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line).append("\n");
+            }
+            JSONObject photoObject = new JSONObject(builder.toString());
+            return saveDoc(photoObject.get("file").toString());
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        catch (JSONException e)
+        {
+            e.printStackTrace();
+        }
+        catch (KException e)
+        {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private void setFileName(String filename, FileBody fileBody)
+    {
+        if (filename != null) {
+            try
+            {
+                Field field = fileBody.getClass().getDeclaredField("filename");
+                field.setAccessible(true);
+
+                field.set(fileBody, filename);
+            }
+            catch (IllegalAccessException e)
+            {
+                e.printStackTrace();
+            }
+            catch (NoSuchFieldException e)
+            {
+                e.printStackTrace();
+            }
+        }
     }
 }
